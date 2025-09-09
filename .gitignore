@@ -7,8 +7,9 @@ cache/
 typechain/
 coverage/
 
-# Compiled contracts
-*.json
+# Ignore only ABI/output JSONs
+artifacts/**/*.json
+cache/**/*.json
 
 # Env files
 .env

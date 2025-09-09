@@ -17,10 +17,10 @@ contract MintaroReputation is ERC721URIStorage, Ownable {
 
     mapping(uint256 => Badge) public badgeDetails;
 
-    constructor() ERC721("MintaroBadge", "MTB") {}
+    constructor() ERC721("MintaroBadge", "MTB") Ownable(msg.sender) {}
 
     function mintBadge(address freelancer, uint8 rating, string memory ipfsCID) external {
-        require(rating >= 1 && rating <= 5, "Rating must be 1–5");
+        require(rating >= 1 && rating <= 5, "Rating must be 1-5");
 
         uint256 badgeId = badgeCounter;
         badgeCounter++;

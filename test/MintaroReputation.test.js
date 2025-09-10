@@ -1,26 +1,49 @@
-const { expect } = require("chai");
+// test/MintaroReputation.test.js
+import { expect } from "chai";
+import hre from "hardhat";            // ← default import
+const { ethers } = hre;               // ← get ethers from hre
 
-describe("MintaroReputation", function () {
-  let mintaro, client, freelancer;
+describe("MintaroReputation", () => {
+  async function deploy() {
+    const [owner, alice] = await ethers.getSigners();
+    const Factory = await ethers.getContractFactory("MintaroReputation");
+    const c = await Factory.deploy();
+    await c.waitForDeployment();
+    return { c, owner, alice };
+  }
 
-  beforeEach(async function () {
-    const MintaroReputation = await ethers.getContractFactory("MintaroReputation");
-    [client, freelancer] = await ethers.getSigners();
-    mintaro = await MintaroReputation.deploy();
-    await mintaro.deployed();
+  it("sets deployer as owner (OZ v5 Ownable)", async () => {
+    const { c, owner } = await deploy();
+    expect(await c.owner()).to.equal(owner.address);
   });
 
-  it("should mint a badge with rating and store metadata", async function () {
-    const tx = await mintaro.connect(client).mintBadge(freelancer.address, 5, "ipfs://review1");
+  it("mints a badge, stores rating + URI", async () => {
+    const { c, alice } = await deploy();
+    const rating = 5;
+    const uri = "ipfs://bafy.../review.json";
+
+    const tx = await c.mintBadge(alice.address, rating, uri);
     await tx.wait();
 
-    const badge = await mintaro.badgeDetails(0);
-    expect(badge.freelancer).to.equal(freelancer.address);
-    expect(badge.rating).to.equal(5);
-    expect(badge.ipfsCID).to.equal("ipfs://review1");
+    const id = (await c.badgeCounter()) - 1n;
 
-    const badges = await mintaro.getBadgesOf(freelancer.address);
-    expect(badges.length).to.equal(1);
-    expect(badges[0]).to.equal(0);
+    expect(await c.ownerOf(id)).to.equal(alice.address);
+    expect(await c.tokenURI(id)).to.equal(uri);
+
+    const b = await c.badgeDetails(id);
+    expect(b.rating).to.equal(rating);
+    expect(b.timestamp).to.be.gt(0);
+  });
+
+  it("reverts for out-of-range rating", async () => {
+    const { c, alice } = await deploy();
+    await expect(c.mintBadge(alice.address, 0, "ipfs://x")).to.be.revertedWith("Rating must be 1-5");
+    await expect(c.mintBadge(alice.address, 6, "ipfs://x")).to.be.revertedWith("Rating must be 1-5");
+  });
+
+  it("only owner can mint", async () => {
+    const { c, alice } = await deploy();
+    await expect(c.connect(alice).mintBadge(alice.address, 5, "ipfs://x"))
+      .to.be.revertedWithCustomError(c, "OwnableUnauthorizedAccount");
   });
 });
